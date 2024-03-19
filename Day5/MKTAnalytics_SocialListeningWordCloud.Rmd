@@ -1,0 +1,143 @@
+---
+title: ""
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+  pdf_document: default
+---
+
+
+```{r do not show warnings}
+# don't show warnings while knitting
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+```{r libraries}
+library("tm")		 #processing texts and counting words
+library("wordcloud") 	 #plotting a word cloud
+library("RColorBrewer")
+library("readxl")
+```
+
+```{r constants}
+# constants
+my_working_dir_mac <- "~/Desktop/MKTAnalytics/Data/Sephora" # working directory if on a Mac
+my_working_dir_pc <- "C:\\Users\\rebec\\OneDrive\\Desktop\\MKTAnalytics\\Data\\Sephora" # if on a PC
+
+myFile_products <- "products.csv"
+myFile_reviews <- "reviews.csv"
+myFile_authors <- "authors.csv"
+
+mlk_sheet <- "MLKDream"
+mlk_export <-"MLK Word Cloud.pdf"
+```
+
+```{r import data, on a Mac OS computer}
+# import data
+setwd(my_working_dir_mac)
+products <- read.csv(myFile_products)
+reviews <- read.csv(myFile_reviews)
+authors <- read.csv(myFile_authors)
+
+MLK <- read_xlsx("../MLK.xlsx", sheet=mlk_sheet)
+```
+
+```{r mlk corpus}
+docs <- Corpus(VectorSource(MLK))	
+docs <- tm_map(docs, content_transformer(tolower))
+docs <- tm_map(docs, removeNumbers)
+docs <- tm_map(docs, removePunctuation)
+docs <- tm_map(docs, removeWords, stopwords("english"))
+
+#remove any other words or strings that do not add insights
+docs <- tm_map(docs, removeWords, c("the", "and", "some", "to", "is", "was", "but"))
+
+
+m <- sort(rowSums(as.matrix(TermDocumentMatrix(docs))), decreasing = TRUE)
+d <- data.frame(word = names(m),freq=m)
+```
+
+```{r top 20 words mlk}
+# output the top 20 rows
+head(d, 20)
+```
+
+```{r mlk word cloud export}
+my_working_dir_mac <- "~/Desktop/MKTAnalytics/Results/"
+setwd(my_working_dir_mac)
+set.seed(1234) 
+pdf(mlk_export) #export to PDF
+wordcloud(words = d$word, freq = d$freq, min.freq = 1, max.words=200, random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2")) 
+```
+
+```{r mlk word cloud}
+wordcloud(words = d$word, freq = d$freq, min.freq = 1, max.words=200, random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2")) 
+```
+
+```{r sephora word clouds}
+# word cloud of 5-star review
+docsS <- Corpus(VectorSource(reviews[reviews$rating==5,]$review_text)) # load the data as a corpus
+
+toSpace <- content_transformer(function (x , pattern ) gsub(pattern, " ", x))
+docsS <- tm_map(docsS, toSpace, "“")
+docsS <- tm_map(docsS, toSpace, "”")
+docsS <- tm_map(docsS, toSpace, "’")
+docsS <- tm_map(docsS, toSpace, "—")
+docsS <- tm_map(docsS, content_transformer(tolower))
+docsS <- tm_map(docsS, removeNumbers)
+docsS <- tm_map(docsS, removePunctuation)
+docsS <- tm_map(docsS, removeWords, stopwords("english"))
+
+#remove any words that do not add insights
+docsS <- tm_map(docsS, removeWords, c("mer", "la", "loccitane", "cream", "product", "skin", "lamer", "use", "using", "face"))
+
+docsS <- tm_map(docsS, stripWhitespace)
+
+mS <- sort(rowSums(as.matrix(TermDocumentMatrix(docsS))), decreasing = TRUE)
+dS <- data.frame(word = names(mS),freq=mS)
+head(dS,20)
+```
+```{r word cloud plot}
+set.seed(1234)
+
+# exprt to PDF
+#Wordcloud <- 'WordCloud.pdf'
+#pdf(Wordcloud)
+#setwd(myDirectory_Mac) # set active directory
+
+# max show 200 words on page
+# scale: 2 for most freq. words, .4 for least freq.
+wordcloud(words = dS$word, freq = dS$freq, min.freq = 2,
+          max.words=200, random.order=FALSE, rot.per=0.4, scale = c(2,.4), colors=brewer.pal(8, "Dark2"))
+```
+
+```{r histogram v bar chart}
+reviews$submission_date <- as.Date(reviews$submission_date, format = "%m/%d/%y")
+reviews$ReviewDate <- format(reviews$submission_date, "%d")
+reviews$ReviewMonthInt <- as.integer(format(reviews$submission_date, "%m"))
+reviews$ReviewMonth <- format(reviews$submission_date, "%b")
+reviews$ReviewYear <- format(reviews$submission_date, "%y")
+
+library(sqldf)
+reviewsByMonth <- sqldf("
+      SELECT ReviewMonth, ReviewMonthInt, COUNT(review_id) AS Reviews
+      FROM  reviews
+      WHERE ReviewYear BETWEEN 15 AND 22
+      GROUP BY ReviewMonth, ReviewMonthInt
+      ORDER BY ReviewMonthInt
+      ")
+
+library(ggplot2)
+barEx <- ggplot(data = reviewsByMonth, aes(x = reorder(ReviewMonth, ReviewMonthInt), y = Reviews)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Luxury Brands Engagement by Month", x = "Review Month", y = "# of Reviews")
+
+hisEx <- ggplot(data = reviews, aes(rating)) + 
+  geom_histogram(binwidth = .5) + 
+  labs(title = "Luxury Brands Ratings Distribution", x = "Review Ratings (5 Stars)", y = "# of Reviews")
+
+library(gridExtra); library(grid)
+grid.arrange(hisEx, barEx, nrow=1, ncol=2)
+```
+

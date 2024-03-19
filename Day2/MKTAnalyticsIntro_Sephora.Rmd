@@ -1,0 +1,105 @@
+---
+title: "Demo1"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+  pdf_document: default
+---
+
+```{r install libraries}
+# install libraries
+# only need to run once ever
+# comment it out before knitting
+
+#install.packages("dplyr")
+#install.packages("sqldf")
+#...whatever other packages you are missing
+```
+
+```{r}
+# don't show warnings while knitting
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+```{r constants}
+# constants
+my_working_dir_mac <- "~/Desktop/MKTAnalytics/Data/Sephora" # working directory if on a Mac
+my_working_dir_pc <- "C:\\Users\\rebec\\OneDrive\\Desktop\\MKTAnalytics\\Data\\Sephora" # if on a PC
+
+myFile_products <- "products.csv"
+myFile_reviews <- "reviews.csv"
+myFile_authors <- "authors.csv"
+print(getwd())
+```
+
+```{r import data, on a Mac OS computer}
+# import data
+setwd(getwd())
+products <- read.csv(myFile_products)
+reviews <- read.csv(myFile_reviews)
+authors <- read.csv(myFile_authors)
+```
+
+```{r take a look at the products table}
+# look at first 6 rows of the products table
+head(products)
+```
+
+```{r take a look at the reviews table}
+# look at the first 6 rows of the reviews table
+head(reviews)
+```
+
+```{r take a look at the authors table}
+# look at the first 6 rows of the authors table
+head(authors)
+```
+
+```{r pull in product info}
+# pull in product info by inner join
+# call the library, sqldf, 
+# then the function, which also happens to be called sqldf
+reviews <- sqldf::sqldf(" 
+SELECT r.*, p.brand_name, p.product_name
+FROM reviews r INNER JOIN products p ON r.product_id = p.product_id
+                      ")
+
+# convert the column to type "date"
+reviews$submission_date <- as.Date(reviews$submission_date, format = "%m/%d/%y")
+```
+
+```{r get distinct values}
+# get distinct values of brand name and product name
+# in the products table
+# call the library, dplyr, then the function distinct
+dplyr::distinct(reviews, brand_name, product_name)
+```
+
+```{r calculate means}
+# calculate means
+mean(reviews$rating)
+mean(reviews[reviews$brand_name=='L\'Occitane',]$rating)
+
+# Need the slash because of the ' in L'Occitane
+# Your turn: what is the mean for La Mer?
+```
+
+```{r}
+mean(reviews[reviews$brand_name=='La Mer',]$rating)
+```
+
+```{r plot histograms}
+# plot histograms. Lay out the 3 graphs
+layout(matrix(c(1,1,2,3), 2, 2, byrow = TRUE))
+
+hTotal <- hist(reviews$rating, breaks = seq(0, 5, by = 1),
+           main = 'Distribution of Ratings', xlab = 'Review Ratings (in Stars)')
+
+h1 <- hist(reviews[reviews$brand_name == 'L\'Occitane',]$rating, breaks = seq(0, 5, by = 1),
+           main = 'Distribution of L\'Occitane Ratings', xlab = 'Review Ratings (in Stars)')
+
+h2 <- hist(reviews[reviews$brand_name == 'La Mer',]$rating, breaks = seq(0, 5, by = 1),
+           main = 'Distribution of La Mer Ratings', xlab = 'Review Ratings (in Stars)')
+
+```

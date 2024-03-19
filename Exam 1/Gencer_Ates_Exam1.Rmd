@@ -1,0 +1,213 @@
+---
+title: "Gencer Ates - Exam 1"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+  pdf_document: default
+---
+
+
+```{r do not show warnings}
+# don't show warnings while knitting
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+```{r libraries}
+library("tm")		 #processing texts and counting words
+library("wordcloud") 	 #plotting a word cloud
+library("RColorBrewer")
+library("readxl")
+library(sqldf)
+library(vader)
+library(ggplot2)
+```
+
+```{r constants}
+# constants
+my_working_dir_pc <- "D:\\onurg\\Documents\\MKT 326\\Exam 1" # if on a PC 
+
+
+myFile_yelp <- "YelpReviews.csv"
+
+```
+
+
+```{r import data}
+# import data
+setwd(my_working_dir_pc)
+yelp <- read.csv(myFile_yelp)
+
+```
+
+```{r data exploration}
+
+head(yelp, 20)
+```
+
+a) How is Dunkin doing compared to Starbucks? What is the average review ra>ng for
+Starbucks? For Dunkin? A[er calcula>ng the means, plot 2 histograms of review ra>ng,
+one for Starbucks, one for Dunkin. Finally, interpret the histograms: as a marke>ng
+manager for Dunkin, should you be concerned?
+
+```{r initial comparissons}
+
+brand_avg_ratings <- sqldf::sqldf("
+      SELECT Brand, avg(Rating)
+      FROM  yelp y
+      GROUP BY 1
+      
+      ")
+brand_avg_ratings
+```
+Not a good start, our average rating is lower than Starbucks, and even worse, we are below average (assuming 3 is average).
+
+```{r histograms}
+
+sbucks_ratings <- sqldf("
+      SELECT Rating
+      FROM  yelp y
+      WHERE Brand = 'Starbucks'
+      ")
+
+dunk_ratings <- sqldf("
+      SELECT Rating
+      FROM  yelp y
+      WHERE Brand = 'Dunkin'
+      ")
+
+his_star <- ggplot(data = sbucks_ratings, aes(Rating)) + 
+  geom_histogram(binwidth = .5) + 
+  labs(title = "Starbucks Ratings Distribution", x = "Review Ratings (out of 5 Stars)", y = "# of Reviews")
+
+his_dunk <- ggplot(data = dunk_ratings, aes(Rating)) + 
+  geom_histogram(binwidth = .5) + 
+  labs(title = "Dunkin Donuts Ratings Distribution", x = "Review Ratings (out of 5 Stars)", y = "# of Reviews")
+
+library(gridExtra); library(grid)
+grid.arrange(his_star, his_dunk, nrow=1, ncol=2)
+```
+
+
+
+
+First of all, the amount of people giving ratings to starbucks is significantly more than those that do to dunkin's.  What's more dramatic is even though like us, Dunkin's, Starbucks has a significant number of people rating "1", they have a good majority rating 4s and 5s to offset the negativity, while we don't have those positive ratings to offset our bad look. At this point our focus should be turned into 3 fronts,
+1 - Provide the users with a easier feedback channel so we can increase the volume of our data, the more volume we have the more indepts we can see the issues and/or how good we really are
+2 - Inspect what was the reason the reviewers gave for rating 1, whie also checking what did the 4s and 5s like about us
+3 - Observe what Starbucks is doing differently than us and start incorporating some of those strategies.
+
+
+--------------------------------------------------------
+
+
+b) Does negativity bias exist? That is, do people tend to express nega>ve experiences more
+so than posi>ve experiences? First, create a data column that stores the text length in
+characters for each review.
+
+
+
+```{r text length}
+yelp2 <- sqldf("
+      SELECT *, length(ReviewText) as ReviewLen
+      FROM  yelp y
+      ")
+
+head(yelp2)
+```
+
+
+
+Then, graph a bar chart that shows the average text length by review ra>ng. That is, the
+x axis is 1-, 2-, 3-, 4-, and 5-star, and the y axis is the average review length by the star
+ra>ng.
+
+```{r bar chart}
+
+yelp_overall_lenvr <- sqldf("
+      SELECT Rating, AVG(ReviewLen) as AvgRevLen
+      FROM  yelp2 y
+      GROUP BY 1
+      ")
+
+sbucks_len <- sqldf("
+      SELECT Rating, AVG(ReviewLen) as AvgRevLen
+      FROM  yelp2 y
+      WHERE Brand = 'Starbucks'
+      GROUP BY 1
+      ")
+
+dunk_len <- sqldf("
+      SELECT Rating, AVG(ReviewLen) as AvgRevLen
+      FROM  yelp2 y
+      WHERE Brand = 'Dunkin'
+      GROUP BY 1
+      ")
+
+bar_overalllen <- ggplot(data = yelp_overall_lenvr, aes(x = Rating, y = AvgRevLen)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Overall Ratings by Average Review Length", x = "Review Ratings (out of 5 Stars)", y = "Average Review Length")
+
+bar_starlen <- ggplot(data = sbucks_len, aes(x = Rating, y = AvgRevLen)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Starbucks Ratings by Average Review Length", x = "Review Ratings (out of 5 Stars)", y = "Average Review Length")
+
+bar_dunklen <- ggplot(data = dunk_len, aes(x = Rating, y = AvgRevLen)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Dunkin' Ratings by Average Review Length", x = "Review Ratings (out of 5 Stars)", y = "Average Review Length")
+
+grid.arrange(bar_overalllen, bar_starlen, bar_dunklen, nrow=2, ncol=2)
+```
+
+
+
+
+Finally, compare the text length of 1-star reviews with that of 5-star reviews with a t test.
+Include the means and sta>s>cal significance in your interpreta>on writeup and answer
+the ques>on.
+```{r t-test}
+
+t.test(yelp2[yelp2$Rating == 5, ]$ReviewLen, yelp2[yelp2$Rating == 1, ]$ReviewLen)
+```
+
+
+
+On average the bad reviews are much longer than those that are positive regardless of the brand. On average the negative ratings of 1 has the about 500 characters per review but positives have about 300-350 characters on average. This already shows there is a bias towards negative reviews. When done a hypothesis test we saw that yes high ratings don't have a statistically similar lenghts either, 
+alternative hypothesis: true difference in means is not equal to 0
+mean of x (5 star) mean of y (1 star) 
+ 354.4719           503.8103 
+
+
+
+----------------------------------------------------------
+
+
+c) Do “cool” reviews express more posi7ve or more nega7ve sen7ments than uncool
+reviews? This ques>on is purposefully vague - design the analyses yourself and do them.
+Be sure to write down your interpreta>ons of the results and the final answer to the
+ques>on.
+
+```{r text}
+cool_df <- sqldf("
+      SELECT Rating, AVG(CoolVotes) avg_cool, AVG(ReviewLen) as avgrevlen
+      FROM  yelp2 y
+      GROUP BY 1
+      ")
+
+
+bar_overalllen2 <- ggplot(data = cool_df, aes(x = Rating, y = avgrevlen)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Overall Ratings by Average Review Length", x = "Review Ratings (out of 5 Stars)", y = "Average Review Length")
+
+bar_coolvrate <- ggplot(data = cool_df, aes(x = Rating, y = avg_cool)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Overall Ratings by Average Cool Vote", x = "Review Ratings (out of 5 Stars)", y = "Average Cool Vote")
+
+
+grid.arrange(bar_overalllen2, bar_coolvrate, nrow=1, ncol=2)
+```
+
+
+
+
+
+Do to time constraints this is as far as I go with my analysis. From the what it we can see cool cotes are more akin to neutral reviews, as in rewiews that either show both positives and negatives, or vaguely describe positives in a sub par level. Thought, I need to say, cool votes lean more towards the psotive ratings than the negative ones.

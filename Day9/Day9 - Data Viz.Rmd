@@ -1,0 +1,94 @@
+---
+title: "Day9 - Data Viz"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries}
+library("tm")		 #processing texts and counting words
+library("wordcloud") 	 #plotting a word cloud
+library("RColorBrewer")
+library("readxl")
+
+library(sqldf)
+library(ggplot2)
+library(gridExtra)
+library(grid)
+```
+
+```{r constants}
+# constants
+
+
+myFile_products <- "products.csv"
+myFile_reviews <- "reviews.csv"
+myFile_authors <- "authors.csv"
+
+```
+
+
+```{r import data, on a Mac OS computer}
+# import data
+setwd(getwd())
+products <- read.csv(myFile_products)
+reviews <- read.csv(myFile_reviews)
+authors <- read.csv(myFile_authors)
+
+```
+
+
+
+```{r histogram v bar chart}
+reviews$submission_date <- as.Date(reviews$submission_date, format = "%m/%d/%y")
+reviews$ReviewDate <- format(reviews$submission_date, "%d")
+reviews$ReviewMonthInt <- as.integer(format(reviews$submission_date, "%m"))
+reviews$ReviewMonth <- format(reviews$submission_date, "%b")
+reviews$ReviewYear <- format(reviews$submission_date, "%y")
+
+
+reviewsByMonth <- sqldf("
+      SELECT ReviewMonth, ReviewMonthInt, COUNT(review_id) AS Reviews
+      FROM  reviews
+      WHERE ReviewYear BETWEEN 15 AND 22
+      GROUP BY ReviewMonth, ReviewMonthInt
+      ORDER BY ReviewMonthInt
+      ")
+
+
+barEx <- ggplot(data = reviewsByMonth, aes(x = reorder(ReviewMonth, ReviewMonthInt), y = Reviews)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Luxury Brands Engagement by Month", x = "Review Month", y = "# of Reviews")
+
+hisEx <- ggplot(data = reviews, aes(rating)) + 
+  geom_histogram(binwidth = .5) + 
+  labs(title = "Luxury Brands Ratings Distribution", x = "Review Ratings (5 Stars)", y = "# of Reviews")
+
+
+grid.arrange(hisEx, barEx, nrow=1, ncol=2)
+```
+
+
+```{r bar chart}
+
+reviewsByMonth <- sqldf("
+      SELECT ReviewMonth, ReviewMonthInt, COUNT(review_id) AS Reviews
+      FROM  reviews
+      WHERE ReviewYear BETWEEN 15 AND 22
+      GROUP BY ReviewMonth, ReviewMonthInt
+      ORDER BY ReviewMonthInt
+      ")
+
+
+barEx <- ggplot(data = reviewsByMonth, aes(x = reorder(ReviewMonth, ReviewMonthInt), y = Reviews)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Luxury Brands Engagement by Month", x = "Review Month", y = "# of Reviews")
+
+barEx
+```
